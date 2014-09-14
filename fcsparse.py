@@ -81,18 +81,13 @@ class FCSParser:
                     castType = numpy.float64
                     blockLen = 8
                 self.dataArray = self.readBlockData(dataRaw, dataLength, blockLen, byteOrder, castType)
-                self.dataArray = numpy.reshape(self.dataArray, (self.numValues * self.numParams, 1))
-                self.dataArray = numpy.array(self.dataArray)
-                self.dataArray = self.reshape(self.dataArray, self.numParams, self.numValues)
-                self.dataArray = numpy.transpose(self.dataArray)
-                self.dataArray = self.dataArray[0]
-                
+                self.dataArray = numpy.reshape(self.dataArray, (self.numValues, self.numParams))
+ 
                 #Parameters
                 self.Params=[None] * (self.numParams)
                 for i in range(1, self.numParams + 1):
                         self.Params[i - 1] = self.fileHeader['$P%dN' % (i)]#Different parameters used are found out from the textheader.
-                self.Params = numpy.reshape(self.Params, (1, self.numParams))
-                self.Params = self.Params[0]
+                self.Params = numpy.array(self.Params)
                 
                 #logarithmic data
                 self.logScale = [0] * (self.numParams)
@@ -135,28 +130,7 @@ class FCSParser:
             rawPointer += blockLen
             resultArray[i] = numpy.fromstring(resultArray[i], dtype=castType)#
         return resultArray
-            
-#    def lookupNumericData(self, array, fieldname):#we want to find the element which is after a paritcular element(like'$P1B)in order to find
-#        num = len(array)#the value of the particular element(like BIT)
-#        i = 0
-#        for i in range(0, num):
-#                if array[i] == fieldname:
-#                        ans = array[i+1]
-#                        break
-#        return ans
-                    
+                                
     def list2dict(self, xlist):
         _ = iter(xlist)
         return dict(izip(_, _))
-                    
-    def reshape(self, array1, numParams, numValues):#(reshape an array)
-        num = len(array1)
-        array = [None] * (numParams)            
-        for i in range(0, numParams):
-                array[i] = [None] * (numValues)
-        j = 0           
-        for i in range(0, numValues):
-                for k in range(0, numParams):
-                        array[k][i] = array1[j]
-                        j = j + 1
-        return array
