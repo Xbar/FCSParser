@@ -3,6 +3,7 @@
 
 import sys
 import numpy
+from itertools import izip
 
 class FCSParser:
     def __init__(self, filename):
@@ -11,7 +12,7 @@ class FCSParser:
         self.logScale = ''              #If parameter is stored in log
         self.paramsLog = ''             #Use l for log transformed parameters
         self.dataLog = ''               #Transform log data into decimal
-        self.fileHeaderCell = ''        #Metadata in the header
+        self.fileHeader = {}        #Metadata in the header
         self.dataArray = ''             #Raw data from the file
         self.datam3 = ''
         self.numParams = ''             #Number of parameters in the file
@@ -46,18 +47,18 @@ class FCSParser:
                 
                 fcs_file.seek(fileHeaderStart, 0)
                 fileHeaderText = fcs_file.read(fileHeaderEnd - fileHeaderStart + 1)
-                #Replace textCell with self.fileHeaderCell
-                self.fileHeaderCell = fileHeaderText.split(fileHeaderText[0])
-                del self.fileHeaderCell[0]
-                if fileDataStart==0:
-                    fileDataStart= lookupNumericData(self.fileHeaderCell,'$BEGINDATA')
-                if fileDataEnd ==0:
-                    fileDataEnd=lookupNumericData(self.fileHeaderCell,'$ENDDATA')
-                self.numParams = int(self.lookupNumericData(self.fileHeaderCell, '$PAR'))
-                self.numValues = int(self.lookupNumericData(self.fileHeaderCell, '$TOT'))
-                byteOrder = self.lookupNumericData(self.fileHeaderCell,'$BYTEORD')#Finds the Byte Order
-                paramValsBits= self.lookupNumericData(self.fileHeaderCell,'$P1B')#Finds the number of BIT
-                dataType = self.lookupNumericData(self.fileHeaderCell,'$DATATYPE')#Finds the Data Type        
+                fileHeaderCell = fileHeaderText.split(fileHeaderText[0])
+                del fileHeaderCell[0]
+                self.fileHeader = self.list2dict(fileHeaderCell)
+                if fileDataStart == 0:
+                    fileDataStart = self.fileHeader['$BEGINDATA']
+                if fileDataEnd == 0:
+                    fileDataEnd = self.fileHeader['$ENDDATA']
+                self.numParams = int(self.fileHeader['$PAR'])
+                self.numValues = int(self.fileHeader['$TOT'])
+                byteOrder = self.fileHeader['$BYTEORD']#Finds the Byte Order
+                paramValsBits= self.fileHeader['$P1B']#Finds the number of BIT
+                dataType = self.fileHeader['$DATATYPE']#Finds the Data Type        
                 fcs_file.seek(fileDataStart, 0)#Go to the part of the file where data starts
                 dataLength = fileDataEnd - fileDataStart + 1
                 dataRaw = fcs_file.read(dataLength)#Read the data.
@@ -89,7 +90,7 @@ class FCSParser:
                 #Parameters
                 self.Params=[None] * (self.numParams)
                 for i in range(1, self.numParams + 1):
-                        self.Params[i - 1] = self.lookupNumericData(self.fileHeaderCell, '$P%dN' % (i))#Different parameters used are found out from the textheader.
+                        self.Params[i - 1] = self.fileHeader['$P%dN' % (i)]#Different parameters used are found out from the textheader.
                 self.Params = numpy.reshape(self.Params, (1, self.numParams))
                 self.Params = self.Params[0]
                 
@@ -97,13 +98,13 @@ class FCSParser:
                 self.logScale = [0] * (self.numParams)
                 for i in range(1, self.numParams + 1):
                     try:
-                        decade = self.lookupNumericData(self.fileHeaderCell, '$P%dE' % (i))
+                        decade = self.fileHeader['$P%dE' % (i)]
                     except UnboundLocalError:
                         decade = [0,0]
                         
                     decade = int(decade[0])
                     if decade != 0:
-                        Range = int(self.lookupNumericData(self.fileHeaderCell, '$P%dR' % (i)))
+                        Range = int(self.fileHeader['$P%dR' % (i)])
                         m = 0
                         self.logScale[i - 1] = 1
                         for j in range(self.numValues):
@@ -135,15 +136,18 @@ class FCSParser:
             resultArray[i] = numpy.fromstring(resultArray[i], dtype=castType)#
         return resultArray
             
-    def lookupNumericData(self, array, fieldname):#we want to find the element which is after a paritcular element(like'$P1B)in order to find
-        num = len(array)#the value of the particular element(like BIT)
-        i = 0
-        for i in range(0, num):
-                if array[i] == fieldname:
-                        ans = array[i+1]
-                        break
-        return ans
+#    def lookupNumericData(self, array, fieldname):#we want to find the element which is after a paritcular element(like'$P1B)in order to find
+#        num = len(array)#the value of the particular element(like BIT)
+#        i = 0
+#        for i in range(0, num):
+#                if array[i] == fieldname:
+#                        ans = array[i+1]
+#                        break
+#        return ans
                     
+    def list2dict(self, xlist):
+        _ = iter(xlist)
+        return dict(izip(_, _))
                     
     def reshape(self, array1, numParams, numValues):#(reshape an array)
         num = len(array1)
