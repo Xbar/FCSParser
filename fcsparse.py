@@ -2,7 +2,8 @@
 # Adapted from FlowPy 4.0 13.05.20013
 
 import sys
-import numpy
+import numpy as np
+import pandas as pd
 from itertools import izip
 
 class FCSParser:
@@ -12,8 +13,9 @@ class FCSParser:
         self.logScale = ''              #If parameter is stored in log
         self.paramsLog = ''             #Use l for log transformed parameters
         self.dataLog = ''               #Transform log data into decimal
-        self.fileHeader = {}        #Metadata in the header
+        self.fileHeader = {}            #Metadata in the header
         self.dataArray = ''             #Raw data from the file
+        self.fcsData = None
         self.datam3 = ''
         self.numParams = ''             #Number of parameters in the file
         self.numValues = ''             #Number of cells recorded
@@ -66,28 +68,28 @@ class FCSParser:
                 
                 if dataType == 'I':#Integer
                     if paramValsBits == '16':
-                        castType = numpy.uint16
+                        castType = np.uint16
                         blockLen = 2
                     elif paramValsBits == '32':
-                        castType = numpy.uint32
+                        castType = np.uint32
                         blockLen = 4
                     elif paramValsBits == '64':
-                        castType = numpy.uint64
+                        castType = np.uint64
                         blockLen = 8
                 elif dataType == 'F':#Float 32-bit
-                    castType = numpy.float32
+                    castType = np.float32
                     blockLen = 4
                 elif dataType == 'D':#Float 64-bit
-                    castType = numpy.float64
+                    castType = np.float64
                     blockLen = 8
                 self.dataArray = self.readBlockData(dataRaw, dataLength, blockLen, byteOrder, castType)
-                self.dataArray = numpy.reshape(self.dataArray, (self.numValues, self.numParams))
+                self.dataArray = np.reshape(self.dataArray, (self.numValues, self.numParams))
  
                 #Parameters
                 self.Params=[None] * (self.numParams)
                 for i in range(1, self.numParams + 1):
                         self.Params[i - 1] = self.fileHeader['$P%dN' % (i)]#Different parameters used are found out from the textheader.
-                self.Params = numpy.array(self.Params)
+                self.Params = np.array(self.Params)
                 
                 #logarithmic data
                 self.logScale = [0] * (self.numParams)
@@ -107,15 +109,20 @@ class FCSParser:
                                 self.dataArray[j][i] = 10 ** self.dataArray[j][i]
                             else:
                                 self.dataArray[j][i] = 10 ** (self.dataArray[j][i] * decade / float(Range))
+                
+                #Export to dataframe
+                self.fcsData = pd.DataFrame(self.dataArray, columns=self.Params)
                     
-    def getParam(self):
+    def getParams(self):
         return self.Params
     
     def getValue(self, param):
-        for i in range(self.numParams):
-            if self.Params[i] == param:
-                return numpy.transpose(self.dataArray)[i]
-        return None
+        try:
+            values = np.array(self.fcsData[param])
+            return values
+        except KeyError:
+            print "Invalid key"
+            return None
     
     def readBlockData(self, rawData, rawLen, blockLen, byteOrder, castType):
         arrayLen = rawLen / blockLen
@@ -128,7 +135,7 @@ class FCSParser:
             for j in blockEnum:
                 resultArray[i] += rawData[j + rawPointer]
             rawPointer += blockLen
-            resultArray[i] = numpy.fromstring(resultArray[i], dtype=castType)#
+            resultArray[i] = np.fromstring(resultArray[i], dtype=castType)#
         return resultArray
                                 
     def list2dict(self, xlist):
